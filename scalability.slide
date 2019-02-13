@@ -1,0 +1,177 @@
+Web service scalability
+Where is the ceiling?
+13 Feb 2019
+
+Marsel Mavletkulov
+@marselester
+
+: Scalability is what we expect to happen when we add more servers to withstand more load.
+: It's a function that turns workload into throughput.
+: Forecast how concurrency affects throughput.
+
+* Scalability limits
+
+Adding more servers improves throughput up until it doesn't
+(hardware scalability)
+
+: Adding more servers increases throughput until the system exceeds the point of
+: diminishing returns from contention and negative returns from crosstalk.
+: The system's throughput will increase until 35 nodes.
+: Peak throughput will be 12,341 requests per second.
+
+.image img/throughput.png
+
+* Why does this happen?
+
+: Systems don't scale linearly due to contention and crosstalk
+
+Contention-limited scalability due to serialization or queueing — concurrent processes access a shared resource (waiting on a database lock)
+
+: One process can be serviced at a time, others must wait
+
+- the *σ* parameter is a measure of the level of contention in the system which varies between 0 and 1
+- penalty grows linearly
+
+Coherency-limited scalability due to inconsistent copies of data — concurrent processes must agree whose data to use (consensus in cluster, 2-phase commit)
+
+: Coherency refers to the consistency of multiple copies of data that can reside in different locations in a distributed system.
+: If one of those copies gets updated by a concurrent process, then all the other copies immediately become outdated or stale.
+: Any process that now tries to update its copy of that data,
+: will first need to retrieve the most recent copy in order to avoid corrupting the data repository.
+: Cost of getting agreement, overhead for data consistency.
+
+- the *κ* parameter is a measure of the level of coherency in the system which varies between 0 and 1
+- penalty grows quadratically
+
+: You can think of sigma and kappa as percentages
+
+* Contention and coherency examples
+
+: A General Theory of Computational Scalability Based on Rational Functions (Neil J. Gunther) https://arxiv.org/pdf/0808.1431.pdf
+
+.image img/contention-coherency-table.png 200 _
+
+Priority sorting of the message queue, garbage collection
+
+.image img/coherency.png 200 _
+
+* Contention and coherency on hardware/OS/DB level
+
+: A simple capacity model of massively parallel transaction systems (Neil J. Gunther) http://www.perfdynamics.com/Papers/njgCMG93.pdf
+: coherency == super seriality
+
+.image img/hardware-2.png 300 _
+.image img/hardware.png 220 _
+
+* How to reduce contention and crosstalk in a web service
+
+Common setup: load balancer, multiple app servers, and one database
+
+- load balancing: best of two random choices
+- don't hold locks longer that needed (replace single lock by multiple locks)
+- database partitioning
+
+[[https://speakerdeck.com/kavya719/a-practical-look-at-performance-theory?slide=41][How can we improve how the system scales?]]
+
+* Universal scalability law
+
+You can estimate your system's scalability
+
+.image img/usl.png
+
+- *N* is a number of nodes
+- *X(N)* is throughput of the system of *N* nodes, e.g., 100 requests per second
+- *λ* is a throughput of the system with one node *X(1)*
+- *σ* is a coefficient of contention, e.g., σ=0.05 (5%)
+- *κ* is a coefficient of crosstalk, e.g., κ=0.02 (2%)
+
+* Scalability facets
+
+Hardware scalability where the behavior of an application system running on larger hardware configurations is investigated
+
+    How many N servers can we leverage?
+
+Software scalability where the focus is about how the system behaves when the demand increases (when more users are using it or more requests need to be handled)
+
+    How many N users can we serve?
+
+: Analyze System Scalability in R with the Universal Scalability Law (Stefan Möding) https://cran.r-project.org/web/packages/usl/vignettes/usl.pdf
+
+* Hardware scalability
+
+Obtain measurements of throughput at various levels of cluster size, for example
+
+- perhaps in the morning the system has 50 requests/second with 2 pods, afternoon — 100 with 4 pods, and in evening — 200 with 8 pods
+- traffic shadowing — mirror a fraction of production traffic (100 req/s, 4 pods) to a test service (25 req/s, 1 pod) with [[https://www.getambassador.io/docs/dev-guide/test-in-prod][Ambassador]]
+- capture and replay live HTTP traffic with [[https://goreplay.org]]
+
+Each node should receive the same amount and rate of work no matter the cluster size
+
+    (N=1, X=100req/s), (N=2*1, X=2*100req/s), (N=4*1, X=4*100req/s), ...
+
+Measure λ throughput of the system with one node or use regression to determine λ
+
+* Software scalability
+
+Load testing with [[https://locust.io]]
+
+*N* is a number of users (greenlets/goroutines) that can possibly send requests to a web server (some asleep, some active)
+
+*Z* (average think time in seconds) is a delay between requests to emulate user thinking what to do next
+
+*Q* is the number of requests resident in the web server: combined number of requests waiting for service and the number of requests in service
+
+    wait_req_count = arrival_rate * wait_time_seconds
+    serv_req_count = arrival_rate * serv_time_seconds
+    resid_req_count = wait_req_count + serv_req_count
+
+    resp_time_seconds = wait_time_seconds + serv_time_seconds
+    resid_req_count = arrival_rate * resp_time_seconds
+
+: Difference in the pattern of requests arriving: virtual users in a conventional load-testing
+: environments generate a synchronous arrival pattern (closed system),
+: whereas web-based users generate an asynchronous arrival pattern (open system).
+: more outstanding requests there are in the system, the fewer new requests can be initiated by the load generators.
+: No such self-throttling is possible in a purely asynchronous or open system.
+: How to Emulate Web Traffic Using Standard Load Testing Tools (James F. Brady, Neil J. Gunther)
+
+* How to emulate web traffic
+
+Measure requests arrival rate on production load balancer during peak traffic (steady state), e.g., arrival_rate=150 requests/second
+
+Choose the ratio N/Z to be equivalent to arrival_rate, e.g., N=1500 users, Z=10 seconds
+
+To emulate web-user traffic, hold the ratio N/Z fixed while increasing N and Z in the same proportion
+
+    (N=1500, Z=10s), (N=10*1500, Z=10*10s), (N=20*1500, Z=20*10s), (N=30*1500, Z=30*10s), ...
+
+To achieve statistically independent web requests the ratio Q/Z should be small, Q can be non-zero as long as Z is relatively large
+
+If you are limited by N (can't spin many users), then decrease Z while holding N fixed at its max (200 users as in the [[https://arxiv.org/pdf/1607.05356v1.pdf][paper]])
+
+* Estimate contention and crosstalk
+
+Use nonlinear least squares regression to estimate level of contention and crosstalk based on measurements of node count and corresponding throughput
+
+: It finds the optimal coefficient values in order to calculate a best-fit line through the measurements
+
+You need >=6 measurements
+
+Tools for using Universal Scalability Law
+
+- [[https://github.com/codahale/usl4j]]
+- [[https://github.com/smoeding/usl]]
+- and more at [[http://www.perfdynamics.com/Manifesto/USLscalability.html#tth_sEc3][perfdynamics.com]]
+
+* References
+
+- [[https://www.xaprb.com/slides/lisa17-quantifying-scalability-universal-scalability-law/][Scalability is Quantifiable]] Baron Schwartz
+- [[https://speakerdeck.com/kavya719/a-practical-look-at-performance-theory][A Practical Look at Performance Theory]] Kavya Joshi
+- [[https://speakerdeck.com/emfree/queueing-theory][Queueing Theory, In Practice]] Eben Freeman
+- [[https://calendar.perfplanet.com/2017/visualizing-scalability/][Visualizing Scalability]] Neil Gunther
+- [[https://www.vividcortex.com/resources/universal-scalability-law/][Practical Scalability Analysis with the Universal Scalability Law]] Baron Schwartz
+- [[https://arxiv.org/pdf/1607.05356.pdf][How to Emulate Web Traffic Using Standard Load Testing Tools]] James F. Brady, Neil J. Gunther
+- [[http://perfdynamics.blogspot.com/2010/05/emulating-internet-traffic-in-load.html][Emulating Web Traffic in Load Tests]] Neil Gunther
+- [[https://arxiv.org/pdf/0808.1431.pdf][A General Theory of Computational Scalability Based on Rational Functions]] Neil Gunther
+- [[http://www.perfdynamics.com/Papers/njgCMG93.pdf][A simple capacity model of massively parallel transaction systems]] Neil Gunther
+- [[https://cran.r-project.org/web/packages/usl/vignettes/usl.pdf][Analyze System Scalability in R with the Universal Scalability Law]] Stefan Möding
