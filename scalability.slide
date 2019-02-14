@@ -163,6 +163,16 @@ Tools for using Universal Scalability Law
 - [[https://github.com/smoeding/usl]]
 - and more at [[http://www.perfdynamics.com/Manifesto/USLscalability.html#tth_sEc3][perfdynamics.com]]
 
+* Conclusion
+
+Scalability is constrained by contention and crosstalk
+
+The time when your system is unable to keep up with load might come unexpectedly 🚒
+
+Earlier you know your system's limits, better you're prepared to handle increasing load (optimize, redesign)
+
+This presentation provided an overview of how to measure and estimate web service's scalability
+
 * References
 
 - [[https://www.xaprb.com/slides/lisa17-quantifying-scalability-universal-scalability-law/][Scalability is Quantifiable]] Baron Schwartz

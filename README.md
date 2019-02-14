@@ -1,6 +1,11 @@
-# [Web service scalability](https://go-talks.appspot.com/github.com/marselester/scalability/scalability.slide#1)
+# [Web service scalability](https://go-talks.appspot.com/github.com/marselester/scalability/scalability.slide)
 
-This presentation is inspired by Baron Schwartz's talk [Scalability is Quantifiable](https://www.xaprb.com/slides/lisa17-quantifying-scalability-universal-scalability-law/).
+Scalability is constrained by contention and crosstalk.
+The time when your system is unable to keep up with load might come unexpectedly 🚒.
+Earlier you know your system's limits, better you're prepared to handle increasing load (optimize, redesign).
+[This presentation](https://go-talks.appspot.com/github.com/marselester/scalability/scalability.slide)
+provides an overview of how to measure and estimate web service's scalability.
+It is inspired by Baron Schwartz's talk [Scalability is Quantifiable](https://www.xaprb.com/slides/lisa17-quantifying-scalability-universal-scalability-law/).
 
 Run `present` to view the slides with notes:
 
