@@ -113,7 +113,7 @@ Measure λ throughput of the system with one node or use regression to determine
 
 * Software scalability
 
-Load testing with [[https://locust.io]]
+Load testing with [[https://github.com/yandex/yandex-tank][Yandex Tank]] & [[https://github.com/yandex/pandora][Pandora]] or [[https://locust.io]]
 
 *N* is a number of users (greenlets/goroutines) that can possibly send requests to a web server (some asleep, some active)
 
